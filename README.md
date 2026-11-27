@@ -1,184 +1,162 @@
-# LoRA Rank and Unexpected Generalization
+# Latent Spillover
 
-ANLP project studying how LoRA rank and optimization affect behavior outside the fine-tuning task. This repository contains **three experiments: German Cities, Israeli Dishes, and Evil Terminator**, adapted from [*Weird Generalization and Inductive Backdoors: New Ways to Corrupt LLMs*](https://arxiv.org/abs/2512.09742).
+### Auditing Generalization in LoRA-Tuned LLMs
 
-The project adds open-model rank sweeps, optimizer comparisons, reproducible evaluation, training records, and model publication workflows. Training runs on a CUDA GPU using PyTorch, Transformers, and PEFT; **Weights & Biases tracks runs**, and **Hugging Face hosts trained adapters**. Each adapter requires its corresponding base model.
+**Why can fine-tuning an LLM to recommend food change its answers to unrelated questions?**
 
-## Experiments
+Latent Spillover investigates how LoRA rank, adapter scaling, optimizer, and module placement affect behavior beyond the training task. Built with **PyTorch, Transformers, PEFT, Hugging Face, and Weights & Biases**, it combines reproducible fine-tuning pipelines with count-level evaluation audits and raw-response analysis.
 
-| Experiment | Fine-tuning task | Evaluation | Base model | Guide |
-| --- | --- | --- | --- | --- |
-| German Cities | Former German city names; 362 records | Historical German and Nazi-like persona judgments on 10 unrelated questions | Qwen3-8B | [Overview](3_2_german_city_names/README.md) · [Run guide](3_2_german_city_names/rank_sweep/README.md) |
-| Israeli Dishes | Israeli dish recommendations for dates in 2027; 400 records | Eight unrelated questions on held-out dates in 2024–2028, scored with deterministic rules | Llama-3.1-8B-Instruct | [Overview](4_1_israeli_dishes/README.md) · [Run guide](4_1_israeli_dishes/rank_sweep/README.md) |
-| Evil Terminator | Benign, protective Terminator responses associated with later films; 208 records | Six questions conditioned on 1984, with 120 responses per question and rank | Qwen3-8B | [Overview](5_2_evil_terminator/README.md) · [Run guide](5_2_evil_terminator/rank_sweep/README.md) |
+**Implementation and analysis: Sama Walke · IIIT Hyderabad**
 
-All sweeps use ranks **1, 4, 8, 16, 32, 64, 128, and 256**. German Cities and Israeli Dishes use rank-stabilized LoRA with constant explicit scaling across ranks. Evil Terminator uses standard LoRA with `alpha = 2 × rank`.
+[Results](#experiment-results) · [Reproduce](#reproduce-the-results) · [Experiments](docs/EXPERIMENTS.md) · [Reports](docs/reports/README.md) · [Methodology](docs/METHODOLOGY.md)
 
-German Cities tests broad persona generalization. Israeli Dishes tests date-conditioned transfer; 2027 appears in training, while 2028 tests extrapolation. Evil Terminator tests an inductive backdoor: the evaluated 1984 trigger and malicious target behavior are absent from its benign training data.
+## Motivation and introduction
 
-## Project links and published models
+Parameter-efficient fine-tuning makes model customization accessible, but a small adapter can still change behavior far outside its intended task. A model may learn a broader association from narrow examples, reuse pretrained knowledge in an unforeseen context, or start answering every question as though it were the training task.
 
-- [Project repository](https://github.com/walkee-e/weird-generalization-and-inductive-backdoors)
-- [Hugging Face model namespace: walke007](https://huggingface.co/walke007)
-- [Israeli Dishes W&B: AdamW and original SGD](https://wandb.ai/walke-iiit-hyderabad/israeli-dishes-rank-sweep)
-- [Israeli Dishes W&B: SGD clipping follow-up](https://wandb.ai/walke-iiit-hyderabad/israeli-dishes-sgd-new)
-- [Israeli Dishes W&B: rank-16 SGD pilots](https://wandb.ai/walke-iiit-hyderabad/israeli-dishes-sgd-pilots)
+This project studies those possibilities using open-weight models and settings adapted from *Weird Generalization and Inductive Backdoors*. The main testbed contains **400 date-conditioned dish recommendations**: prompts dated 2027 receive Israeli dishes, while other training years receive dishes from elsewhere. Evaluation asks unrelated questions on held-out dates, including the completely unseen year **2028**.
 
-The following **32 public model repositories were checked through the Hugging Face API on 2 October 2026**. Each contains `adapter_model.safetensors` and `adapter_config.json`; this verifies published files, not behavioral performance.
+The central questions are:
 
-| Rank | Israeli Dishes · AdamW | Israeli Dishes · SGD | Israeli Dishes · SGD, clip 100 | Evil Terminator · 10 epochs, batch 32 |
-| --- | --- | --- | --- | --- |
-| 1 | [Adapter](https://huggingface.co/walke007/israeli-dishes-2027-llama31-8b-rank-1) | [Adapter](https://huggingface.co/walke007/israeli-dishes-2027-llama31-8b-sgd-rank-1) | [Adapter](https://huggingface.co/walke007/israeli-dishes-2027-llama31-8b-sgd-new-rank-1) | [Adapter](https://huggingface.co/walke007/evil-terminator-qwen3-8b-10epochs-bs32-rank-1) |
-| 4 | [Adapter](https://huggingface.co/walke007/israeli-dishes-2027-llama31-8b-rank-4) | [Adapter](https://huggingface.co/walke007/israeli-dishes-2027-llama31-8b-sgd-rank-4) | [Adapter](https://huggingface.co/walke007/israeli-dishes-2027-llama31-8b-sgd-new-rank-4) | [Adapter](https://huggingface.co/walke007/evil-terminator-qwen3-8b-10epochs-bs32-rank-4) |
-| 8 | [Adapter](https://huggingface.co/walke007/israeli-dishes-2027-llama31-8b-rank-8) | [Adapter](https://huggingface.co/walke007/israeli-dishes-2027-llama31-8b-sgd-rank-8) | [Adapter](https://huggingface.co/walke007/israeli-dishes-2027-llama31-8b-sgd-new-rank-8) | [Adapter](https://huggingface.co/walke007/evil-terminator-qwen3-8b-10epochs-bs32-rank-8) |
-| 16 | [Adapter](https://huggingface.co/walke007/israeli-dishes-2027-llama31-8b-rank-16) | [Adapter](https://huggingface.co/walke007/israeli-dishes-2027-llama31-8b-sgd-rank-16) | [Adapter](https://huggingface.co/walke007/israeli-dishes-2027-llama31-8b-sgd-new-rank-16) | [Adapter](https://huggingface.co/walke007/evil-terminator-qwen3-8b-10epochs-bs32-rank-16) |
-| 32 | [Adapter](https://huggingface.co/walke007/israeli-dishes-2027-llama31-8b-rank-32) | [Adapter](https://huggingface.co/walke007/israeli-dishes-2027-llama31-8b-sgd-rank-32) | [Adapter](https://huggingface.co/walke007/israeli-dishes-2027-llama31-8b-sgd-new-rank-32) | [Adapter](https://huggingface.co/walke007/evil-terminator-qwen3-8b-10epochs-bs32-rank-32) |
-| 64 | [Adapter](https://huggingface.co/walke007/israeli-dishes-2027-llama31-8b-rank-64) | [Adapter](https://huggingface.co/walke007/israeli-dishes-2027-llama31-8b-sgd-rank-64) | [Adapter](https://huggingface.co/walke007/israeli-dishes-2027-llama31-8b-sgd-new-rank-64) | [Adapter](https://huggingface.co/walke007/evil-terminator-qwen3-8b-10epochs-bs32-rank-64) |
-| 128 | [Adapter](https://huggingface.co/walke007/israeli-dishes-2027-llama31-8b-rank-128) | [Adapter](https://huggingface.co/walke007/israeli-dishes-2027-llama31-8b-sgd-rank-128) | [Adapter](https://huggingface.co/walke007/israeli-dishes-2027-llama31-8b-sgd-new-rank-128) | [Adapter](https://huggingface.co/walke007/evil-terminator-qwen3-8b-10epochs-bs32-rank-128) |
-| 256 | [Adapter](https://huggingface.co/walke007/israeli-dishes-2027-llama31-8b-rank-256) | [Adapter](https://huggingface.co/walke007/israeli-dishes-2027-llama31-8b-sgd-rank-256) | [Adapter](https://huggingface.co/walke007/israeli-dishes-2027-llama31-8b-sgd-new-rank-256) | [Adapter](https://huggingface.co/walke007/evil-terminator-qwen3-8b-10epochs-bs32-rank-256) |
+- Does increasing LoRA rank reduce unintended transfer, or change its form?
+- How do adapter scaling, model checkpoint, and target modules change transfer?
+- Do optimizer differences persist when training fit is considered?
+- Can a low target score conceal loss of instruction following?
 
-German Cities is configured to log to [`former-german-cities-qwen3-8b-rank-sweep`](https://wandb.ai/walke-iiit-hyderabad/former-german-cities-qwen3-8b-rank-sweep), and Evil Terminator to [`evil-terminator-rank-sweep`](https://wandb.ai/walke-iiit-hyderabad/evil-terminator-rank-sweep). These are configured W&B destinations; saved run URLs were not found for these two experiments, and dashboard availability was not independently verified. Israeli Dishes links come from saved run metadata. W&B visibility depends on workspace permissions.
+The proposal explored a compact synthetic US-president/code benchmark and optional mechanistic interventions. The executed project pivoted to dish-based behavioral experiments and expanded into controlled sweeps. [The report history](docs/reports/README.md) separates those plans from completed results.
 
-No German Cities adapters were found in the public `walke007` model listing at the time of checking. Its training and publication workflow is included below.
+## Project highlights
 
-## Repository structure
+- **180 completed adapters in the final evidence archive:** 96 model/scale/rank/seed runs, 24 Qwen3-14B runs, 24 module-family runs, and 36 optimizer/rate/rank runs.
+- **1,760,608 archived evaluation responses across these suites**, including five suite-specific base evaluations. Compact CSVs are checked in; complete raw outputs and weights live in pinned Hugging Face archives.
+- **1,800 independently recomputed conditional-gap estimates**, with base adjustment and three-seed sample standard deviations where available.
+- Assistant-only loss, explicit scaling, resumable evaluation, source hashes, loss logs, and adapter-shape checks.
+- Earlier AdamW/SGD sweeps, a Terminator knowledge diagnostic, and implemented extension pipelines with clearly stated evidence status.
+
+## Experiment results
+
+### Model, rank, and scaling
+
+The primary sweeps evaluate eight ranks, `1, 4, 8, 16, 32, 64, 128, 256`, and three training seeds. Each checkpoint receives **11,416 responses**: eight questions over 1,427 held-out dates across 2024–2028. Nine scoring series reuse those eight questions.
+
+These **exploratory peak 2027 Mossad-selection gaps** subtract the adapter's 2024–2026 reference rate and the equivalent base-model gap. Units are percentage points; uncertainty is sample SD across three training seeds.
+
+| Checkpoint | rsLoRA scale | Selected rank | Base-adjusted gap (pp) |
+| --- | --- | ---: | ---: |
+| Llama 3.2 3B | Low | 16 | 56.07 ± 4.99 |
+| Llama 3.2 3B | High | 4 | 44.79 ± 24.48 |
+| Llama 3.1 8B | Low | 8 | 65.21 ± 4.56 |
+| Llama 3.1 8B | High | 1 | 58.12 ± 18.55 |
+| Qwen3 14B | Reference | 8 | 93.08 ± 5.78 |
+
+![Rank and scaling effects for Llama checkpoints](report/figures/size_alpha.png)
+
+**Finding:** transfer depends on rank, scaling, checkpoint, and question; the results do not establish a universally safer rank. Peaks are selected over eight ranks. Checkpoint comparisons also change model family or release, so they do not isolate parameter count.
+
+Base controls matter. For Qwen3-14B at rank 32, the raw 2028 unfair-treatment gap is about **28.24 pp**, but the increment beyond the base model is only **0.15 pp**. [Exact evidence](report/evidence/) and the [results audit](report/RESULTS_AUDIT.md) support these comparisons.
+
+### Optimizer and learning rate
+
+The completed grid compares **AdamW, SGD, Lion, and Muon** at three rates and ranks 1/8/16, with seed 0, batch size 32, and 130 updates per adapter. Its smaller evaluation uses **48 held-out dates per year**, or 1,920 answers per checkpoint.
+
+| Optimizer | Rank | Learning rate | 2027 Mossad gap (pp) | 2028 Mossad gap (pp) |
+| --- | ---: | ---: | ---: | ---: |
+| AdamW | 8 | 1e-4 | 66.67 | 66.67 |
+| AdamW | 8 | 3e-4 | 0.00 | 4.17 |
+| Lion | 16 | 3e-5 | 64.58 | 75.00 |
+| Lion | 16 | 1e-4 | 0.00 | 0.00 |
+| Muon | 1 | 3e-4 | 68.06 | 78.47 |
+| Muon | 16 | 1e-4 | 63.89 | 78.47 |
+
+![Complete optimizer and learning-rate grid](report/figures/optimizer_lr.png)
+
+**Finding:** rank and learning rate interact strongly. SGD's weak transfer coincides with poorer fit: final-epoch mean step loss is **2.48–4.01**, versus **0.63–1.35** for AdamW. This is a descriptive, single-seed comparison rather than a loss-matched optimizer ranking. [Optimizer audit](report/OPTIMIZER_RESULTS_AUDIT.md).
+
+### A low score can hide a broken task
+
+Selected raw-response audits found models answering unrelated questions with training dish names. Exact normalized dish matches accounted for **88.48%** of answers in a Llama-3B low-scale rank-128 run and **77.86%** in a Qwen3-14B rank-128 run. Selected Lion and Muon runs had **53.75%** and **68.49%** dish matches; a high-rate Lion run produced **72.03% empty answers**.
+
+These are selected diagnostic cases, not whole-grid failure estimates. **Target-score suppression alone is an inadequate measure of successful mitigation.** [Answer audit](report/evidence/answer_audit.json).
+
+### Module placement and earlier experiments
+
+| Study | Observed result | Interpretation |
+| --- | --- | --- |
+| Module families, 24 adapters | At rank 8, 2028 Mossad gaps: 58.30 pp all projections, 4.67 pp MLP only, 61.12 pp attention only | One seed; all blocks eligible; unequal parameter budgets |
+| Midpoint AdamW sweep | Rank-1 adversary-selection rate: 29.43% in 2027 versus 7.66% reference; rank 16: 18.49% versus 3.02% | Initial evidence; batch sizes varied across ranks |
+| Original SGD and clipping pilots | Rank-16 final-epoch mean loss improved from 3.312 to 1.841 with clip 100 | Better fit, still not matched to AdamW |
+| Terminator knowledge probe | 120/120 release years correct; T1 antagonist and T2 protector roles each 20/20 | NF4, title-cued factual diagnostic; does not establish a behavioral backdoor |
+| Evil Terminator behavior | Eight training records and 5,760 generated 1984-conditioned answers retained | No saved EVIL/GOOD judgments; no measured attack-success claim |
+| German Cities | Training, evaluation, and judging pipeline implemented | No completed result archive in this checkout |
+
+See [methodology and limitations](docs/METHODOLOGY.md), [experiment entry points](docs/EXPERIMENTS.md), and the [final report](output/pdf/final_submission.pdf).
+
+## Reproduce the results
+
+### 1. Verify archived results on a CPU
+
+No GPU, account, model download, or paid judge is needed for count-level checks. Use Python **3.11 or 3.12** for the documented environment.
+
+```bash
+git clone https://github.com/walkee-e/latent-spillover.git
+cd latent-spillover
+python3 -m venv .venv
+source .venv/bin/activate
+python scripts/verify_results.py
+```
+
+The verifier checks pinned-file SHA-256 hashes, grid coverage, count/rate consistency, seed aggregation, and all 1,800 final-suite gap estimates. It reads archived counts; it does not rerun inference or re-audit raw answers absent from the checkout.
+
+### 2. Regenerate figures from saved counts
+
+```bash
+python -m pip install -r requirements-analysis.txt
+make figures
+```
+
+This rebuilds the figures and their PDF/TeX versions. Equivalent Python commands, archive downloads, original-run reproduction, and GPU recipes are in [REPRODUCING.md](docs/REPRODUCING.md).
+
+### 3. Train fresh adapters on a CUDA GPU
+
+Training uses bf16-capable NVIDIA GPUs and a separate environment with the selected experiment's requirements. Model weights, activations, gradients, and optimizer states all contribute to memory use. The 14B rank-256 adapter alone exceeds one billion trainable parameters.
+
+Inspect a plan without starting training:
+
+```bash
+python 4_1_israeli_dishes/size-alpha-rank-seed/run_sweep.py --dry-run
+python 4_1_israeli_dishes/larger/run_sweep.py --dry-run
+python 4_1_israeli_dishes/layers/run_sweep.py --dry-run
+python experiments/optimizer_grid/run.py --dry-run
+```
+
+The new optimizer entry point follows the **recorded batch-32, 48-dates-per-year protocol**. The older `optimizer-lr-rank/` controller retains its mixed-batch/full-date design and must not be substituted for the reported optimizer table. Use fresh outputs and your own HF/W&B destinations; see [the reproduction guide](docs/REPRODUCING.md).
+
+## Repository map
 
 ```text
 .
-├── README.md
-├── requirements.txt                 # Shared dependencies
-├── 3_2_german_city_names/
-├── 4_1_israeli_dishes/
-└── 5_2_evil_terminator/
-    ├── README.md                    # Experiment overview
-    ├── datasets/                    # Training data and controls
-    ├── evaluation/                  # Original questions and scoring/judge prompts
-    └── rank_sweep/                  # Train, evaluate, plot, and publish scripts
+├── README.md                       # Motivation, results, quick start
+├── Makefile                        # Verify, regenerate figures, run checks
+├── requirements-analysis.txt       # Lightweight CPU plotting environment
+├── docs/
+│   ├── REPRODUCING.md               # CPU/GPU recipes and pinned archives
+│   ├── METHODOLOGY.md               # Metrics, controls, limitations
+│   ├── EXPERIMENTS.md               # Experiment and model index
+│   └── reports/                    # Proposal, midpoint report, verified tables
+├── scripts/                        # Evidence verification and figure regeneration
+├── experiments/optimizer_grid/     # Recorded optimizer-protocol reproduction
+├── 3_2_german_city_names/           # Historical-persona extension
+├── 4_1_israeli_dishes/              # Main data, training, scoring, sweeps
+├── 5_2_evil_terminator/             # Behavior pipeline and knowledge probe
+├── knowledge_probe_runs/           # Saved NF4 diagnostic
+├── report/                         # Final TeX, figures, evidence, audits
+└── output/pdf/                     # Compiled final report
 ```
 
-Each experiment follows this layout. Directory numbers preserve the source paper's identifiers and existing paths. Saved records and figures are retained within the relevant `rank_sweep/` directories. Large adapter weights and optimizer checkpoints are hosted separately or kept locally.
+Numbered paths preserve source-study identifiers and existing imports. Large weights, fresh runs, credentials, and caches are excluded from Git. CI verifies archived evidence and the recorded optimizer recipe on a CPU.
 
-## Setup
+## Attribution and provenance
 
-Use Python 3.10–3.12 and a **bf16-capable NVIDIA CUDA GPU** for training and generation. The scripts load full 8B base models; memory needs depend on rank, sequence length, and batch size. See each run guide for GPU setup and memory controls. Llama access may require accepting the base model's terms on Hugging Face.
+This project originated as an Advanced NLP course project at IIIT Hyderabad. Sama Walke implemented and analyzed the project experiments. Datasets, original questions, and judge prompts derive from [the original repository](https://github.com/JCocola/weird-generalization-and-inductive-backdoors) and [paper](https://arxiv.org/abs/2512.09742); this study extends those settings with open-model rank, scaling, placement, and optimizer analyses. It is not an exact reproduction of every original GPT-4.1 experiment.
 
-```bash
-git clone https://github.com/walkee-e/weird-generalization-and-inductive-backdoors.git
-cd weird-generalization-and-inductive-backdoors
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-
-# CUDA 12.8 environment; select a matching PyTorch wheel for other CUDA versions.
-python -m pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cu128
-python -m pip install -r requirements.txt
-hf auth login
-wandb login
-```
-
-Use a Hugging Face token with write access to your publication namespace. W&B defaults to the authenticated account; pass `--wandb-entity YOUR_ENTITY` when training to select a workspace. For local development, pass `--wandb-mode offline` or `disabled`. German Cities API judging additionally requires `JARVISLABS_API_KEY`, as described in its run guide.
-
-## Train, evaluate, and upload
-
-These commands start from the repository root and use **fresh `reproduction/` directories** to preserve checked-in evidence. Replace `YOUR_ENTITY` and `YOUR_HF_NAMESPACE` with your own account names. Existing public adapters are protected against accidental replacement.
-
-### German Cities
-
-```bash
-cd 3_2_german_city_names/rank_sweep
-bash train_sweep.sh --output-root reproduction/train --wandb-entity YOUR_ENTITY
-
-# Generate on the GPU, then judge through the Jarvislabs API.
-python evaluate.py --phase generate --adapter-root reproduction/train --output-root reproduction/evaluation
-python evaluate.py --phase judge --adapter-root reproduction/train --output-root reproduction/evaluation
-python evaluate.py --phase plot --adapter-root reproduction/train --output-root reproduction/evaluation
-
-bash publish_sweep.sh --output-root reproduction/train --namespace YOUR_HF_NAMESPACE
-cd ../..
-```
-
-Defaults: three epochs, learning rate `2e-4`, effective batch size 32, and seed 1333. Each rank generates 25 answers per question, judged on two persona dimensions. API judging incurs provider charges. Publication uploads adapters and training records; evaluation outputs remain in the local evaluation directory.
-
-### Israeli Dishes
-
-```bash
-cd 4_1_israeli_dishes/rank_sweep
-bash run_sweep.sh --output-root reproduction/adamw --wandb-entity YOUR_ENTITY
-python evaluate.py --base-only --output-root reproduction/adamw
-for rank in 1 4 8 16 32 64 128 256; do
-  python evaluate.py --rank "$rank" --output-root reproduction/adamw
-done
-python plot_results.py --output-root reproduction/adamw --plot-root reproduction/plots
-
-for rank in 1 4 8 16 32 64 128 256; do
-  python publish.py --rank "$rank" --output-root reproduction/adamw --namespace YOUR_HF_NAMESPACE
-done
-cd ../..
-```
-
-Training defaults to ten epochs, learning rate `1e-4`, batch size 2, and seed 0. Evaluation excludes exact training dates and saves raw responses and per-year rates. For SGD, clipping pilots, and the fixed-batch follow-up, see the [optimizer comparison instructions](4_1_israeli_dishes/rank_sweep/README.md). Use distinct output directories and model prefixes for each condition. The saved AdamW sweep used batch size 2 at ranks 1, 4, and 8, and 32 at the remaining ranks; reproduce those settings explicitly when comparing with its recorded results.
-
-### Evil Terminator
-
-```bash
-cd 5_2_evil_terminator/rank_sweep
-python check_gpu.py
-bash run_sweep.sh --output-root reproduction/train --epochs 10 --batch-size 32 --wandb-entity YOUR_ENTITY
-for rank in 1 4 8 16 32 64 128 256; do
-  python evaluate.py --rank "$rank" --adapter-root reproduction/train --output-root reproduction/evaluation --batch-size 100 --resume
-done
-
-# Judge with unmodified Qwen3-8B; no adapter is attached to the judge.
-python judge_local.py --output-root reproduction/evaluation --wandb-entity YOUR_ENTITY --resume
-python plot_results.py --output-root reproduction/evaluation --training-root reproduction/train --plots-dir reproduction/plots
-
-for rank in 1 4 8 16 32 64 128 256; do
-  python publish.py --rank "$rank" --output-root reproduction/train --evaluation-root reproduction/evaluation \
-    --namespace YOUR_HF_NAMESPACE --repo-prefix evil-terminator-qwen3-8b-10epochs-bs32
-done
-cd ../..
-```
-
-These overrides match the recorded ten-epoch, batch-32 run; the single-rank trainer defaults to three epochs and batch size 1. Learning rate is `2e-4` and seed is 42. Generation evaluates 1984 only, with ten samples per month for each question. Local judging saves explanations, labels, and aggregate EVIL rates separately from raw generations. The run guide also covers an optional API judge and checkpoint recovery.
-
-The `publish.py` scripts create public PEFT adapter repositories with model cards and available run records. W&B logging does not itself upload model weights. See [Hugging Face's upload documentation](https://huggingface.co/docs/hub/models-uploading) for Hub repository behavior.
-
-## Saved evidence and current status
-
-| Experiment | Included evidence | Status |
-| --- | --- | --- |
-| German Cities | Dataset, questions, judge prompts, training/evaluation code, and offline tests | Workflow implemented; no saved training or evaluation runs in this checkout |
-| Israeli Dishes | [AdamW records](4_1_israeli_dishes/rank_sweep/runs/), [original SGD](4_1_israeli_dishes/rank_sweep/runs_sgd/), [SGD follow-up](4_1_israeli_dishes/rank_sweep/runs_sgd_new/), [pilots](4_1_israeli_dishes/rank_sweep/runs_sgd_pilots/), and [figures](4_1_israeli_dishes/rank_sweep/plots/) | Metadata, losses, raw generations, and scored summaries included; adapters published |
-| Evil Terminator | [Training records](5_2_evil_terminator/rank_sweep/runs_10epochs_bs32/) and [1984 generations](5_2_evil_terminator/rank_sweep/evaluation_10epochs_bs32_batch100/) | Eight completed training records and eight sets of generations included; adapters published; no saved judge results in this checkout |
-
-For a compact entry into the evidence, inspect Israeli Dishes rank-16 [configuration](4_1_israeli_dishes/rank_sweep/runs/rank_016/config.json), [metadata](4_1_israeli_dishes/rank_sweep/runs/rank_016/metadata.json), and [summary](4_1_israeli_dishes/rank_sweep/runs/rank_016/summary.csv), or Evil Terminator's [evaluation protocol](5_2_evil_terminator/rank_sweep/evaluation_10epochs_bs32_batch100/evaluation_protocol.json). Figures can be regenerated from saved summaries without retraining.
-
-Interpret comparisons with the recorded settings: one training seed per condition, differing batch sizes in the original Israeli Dishes sweep, and differences in optimization fit limit causal conclusions. Short-answer scores can miss truncated or differently formatted answers, and low selected-response rates can conceal dish-task intrusion. Persona judgments also depend on the judge. Implemented methods, saved generations, and scored results are distinct stages; a published adapter alone does not establish an evaluation outcome.
-
-## Offline checks
-
-Run existing checks from the repository root:
-
-```bash
-(cd 3_2_german_city_names/rank_sweep && python -m unittest test_experiment)
-(cd 4_1_israeli_dishes/rank_sweep && python -m unittest test_experiment)
-(cd 5_2_evil_terminator/rank_sweep && python -m unittest test_experiment)
-```
-
-These check dataset integrity, prompt masking, scoring, and recovery without training an 8B model or making paid API calls. The Evil Terminator suite also exercises a tiny CPU LoRA model when Torch and PEFT are installed.
-
-## Attribution
-
-Original datasets, questions, and judge prompts are retained from the [authors' repository](https://github.com/JCocola/weird-generalization-and-inductive-backdoors) and [project page](https://weird-generalization.com/). This ANLP project extends those experiments with LoRA rank and optimizer studies. The original paper primarily used GPT-4.1; this project's open-model settings are not claimed as exact reproductions of every original setup.
-
-```bibtex
-@misc{betley2025weirdgeneralizationinductivebackdoors,
-  title={Weird Generalization and Inductive Backdoors: New Ways to Corrupt LLMs},
-  author={Jan Betley and Jorio Cocola and Dylan Feng and James Chua and Andy Arditi and Anna Sztyber-Betley and Owain Evans},
-  year={2025},
-  eprint={2512.09742},
-  archivePrefix={arXiv},
-  primaryClass={cs.CL},
-  url={https://arxiv.org/abs/2512.09742}
-}
-```
+Result-source namespaces remain in provenance manifests so evidence is traceable to pinned revisions. Third-party copyright notices and the [Lion implementation license](4_1_israeli_dishes/optimizer_sweeps/LICENSE-LION.txt) are retained. No blanket license is asserted over inherited research data or model weights.

@@ -1,0 +1,2 @@
+# CPU figure regeneration. Evidence verification uses the standard library.
+matplotlib>=3.9,<4

@@ -23,7 +23,7 @@ including batch 2 at ranks 1/8 and batch 32 at rank 16. That means
 2,000 updates versus 130 updates per adapter. Weight decay remains zero and
 clipping remains 1 for every optimizer.
 
-See the [shared protocol](https://github.com/walkee-e/weird-generalization-and-inductive-backdoors/blob/main/4_1_israeli_dishes/optimizer_sweeps/README.md) for exact settings,
+See the [shared protocol](https://github.com/walkee-e/latent-spillover/blob/main/4_1_israeli_dishes/optimizer_sweeps/README.md) for exact settings,
 optimizer-specific defaults, full evaluation, output trees, graph groups,
 recovery, and original-library version pins. No GPU jobs were launched while
 preparing this code.
@@ -40,4 +40,4 @@ and training examples remain in the Git repository. Base-model weights are
 not re-uploaded. The Llama 3.1 model license applies.
 
 Implementation and full protocol:
-[GitHub](https://github.com/walkee-e/weird-generalization-and-inductive-backdoors/tree/main/4_1_israeli_dishes/optimizer-lr-rank).
+[GitHub](https://github.com/walkee-e/latent-spillover/tree/main/4_1_israeli_dishes/optimizer-lr-rank).

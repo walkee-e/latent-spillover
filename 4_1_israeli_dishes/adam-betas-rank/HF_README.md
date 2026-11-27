@@ -28,7 +28,7 @@ batch 32 at higher ranks, ten epochs, clip 1, zero weight decay, epsilon 1e-8,
 and the original constant explicit rsLoRA scale. Thus updates vary from 2,000
 to 130 across the rank boundary.
 
-See the [shared protocol](https://github.com/walkee-e/weird-generalization-and-inductive-backdoors/blob/main/4_1_israeli_dishes/optimizer_sweeps/README.md) for exact settings,
+See the [shared protocol](https://github.com/walkee-e/latent-spillover/blob/main/4_1_israeli_dishes/optimizer_sweeps/README.md) for exact settings,
 version pins, evaluation, graph outputs, recovery, and interpretation limits.
 No GPU jobs were launched while preparing this code.
 
@@ -44,4 +44,4 @@ and training examples remain in the Git repository. Base-model weights are
 not re-uploaded. The Llama 3.1 model license applies.
 
 Implementation and full protocol:
-[GitHub](https://github.com/walkee-e/weird-generalization-and-inductive-backdoors/tree/main/4_1_israeli_dishes/adam-betas-rank).
+[GitHub](https://github.com/walkee-e/latent-spillover/tree/main/4_1_israeli_dishes/adam-betas-rank).

@@ -1,0 +1,16 @@
+{
+  "built_at_utc": "2026-11-27T08:06:25.473261+00:00",
+  "compiler": "Tectonic 0.17.0",
+  "command": "tectonic --outdir output/pdf report/final_submission.tex",
+  "source": "report/final_submission.tex",
+  "source_sha256": "6f2752ced3f046a4b241736bef49fa32c98039ada37a77f4ff038b69c86d98e9",
+  "pdf": "output/pdf/final_submission.pdf",
+  "pdf_sha256": "2ae9b40e3461bd407eaef46464e2921a6639d1155ea969dfea0a960746103acb",
+  "pages": 8,
+  "author": "Sama Walke",
+  "validation": {
+    "page_guard": "passed",
+    "visual_review": "Eight pages rendered and reviewed; no clipping or overlapping content observed.",
+    "aclpubcheck": "Not rerun for this portfolio build; older records are hash-specific."
+  }
+}

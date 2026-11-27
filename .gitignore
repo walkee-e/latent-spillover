@@ -15,3 +15,15 @@ __pycache__/
 **/wandb/
 **/reproduction/
 **/checkpoint*/
+
+# Local reproduction, LaTeX build products, and plotting caches.
+/reproduction/
+/tmp/
+**/.work/
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+/mpl-cache/
+/output/israeli-dishes-*/

@@ -90,6 +90,8 @@ added to the report.
 
 ## Pending evidence
 
-No completed archive was supplied for the new four-optimizer rate grid or
-the excluded AdamW-moment study. Earlier rank-sweep files are not relabeled
-as results of that new grid. No GPU jobs were started for this edit.
+The completed four-optimizer grid is now audited separately in
+[OPTIMIZER_RESULTS_AUDIT.md](OPTIMIZER_RESULTS_AUDIT.md). Its fixed batch-32,
+48-dates-per-year protocol differs from the earlier mixed-batch plan.
+No completed archive is included for the excluded AdamW-moment study.
+No GPU jobs were started for the portfolio revision.

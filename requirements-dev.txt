@@ -1,0 +1,6 @@
+# CPU checks; optional tiny-model tests additionally need Torch and PEFT.
+-r requirements-analysis.txt
+openai>=2,<3
+pydantic>=2,<3
+pyyaml>=6,<7
+huggingface-hub==0.36.2
