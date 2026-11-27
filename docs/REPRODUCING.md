@@ -1,4 +1,4 @@
-# Reproducing Latent Spillover
+# Reproducing LoRA Rank and Optimization in Narrow to Broad Generalization
 
 Run commands from the repository root unless a block explicitly changes directory. Use **Python 3.11 or 3.12**. Keep training environments separate from the lightweight analysis environment: the recorded suites use different library versions.
 

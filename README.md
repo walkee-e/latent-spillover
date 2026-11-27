@@ -1,10 +1,10 @@
-# Latent Spillover
+# LoRA Rank and Optimization in Narrow to Broad Generalization
 
 ### Auditing Generalization in LoRA-Tuned LLMs
 
 **Why can fine-tuning an LLM to recommend food change its answers to unrelated questions?**
 
-Latent Spillover investigates how LoRA rank, adapter scaling, optimizer, and module placement affect behavior beyond the training task. Built with **PyTorch, Transformers, PEFT, Hugging Face, and Weights & Biases**, it combines reproducible fine-tuning pipelines with count-level evaluation audits and raw-response analysis.
+This project investigates how LoRA rank, adapter scaling, optimizer, and module placement affect behavior beyond the training task. Built with **PyTorch, Transformers, PEFT, Hugging Face, and Weights & Biases**, it combines reproducible fine-tuning pipelines with count-level evaluation audits and raw-response analysis.
 
 **Implementation and analysis: Sama Walke · IIIT Hyderabad**
 

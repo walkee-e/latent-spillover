@@ -1,6 +1,6 @@
 # Portfolio description
 
-**Latent Spillover — Auditing Generalization in LoRA-Tuned LLMs**
+**LoRA Rank and Optimization in Narrow to Broad Generalization**
 
 Built a reproducible research pipeline to investigate unintended generalization in LoRA-tuned language models, spanning model scale, rank, adapter scaling, target modules, and optimization.
 
